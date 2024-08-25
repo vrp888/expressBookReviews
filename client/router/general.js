@@ -2,6 +2,7 @@ const express = require('express');
 let books = require("./booksdb.js");
 let users = require("./auth_users.js").users;
 const public_users = express.Router();
+const axios = require('axios');
 
 // Check if a user with the given username already exists
 const doesExist = (username) => {
@@ -38,54 +39,64 @@ public_users.post("/register", (req,res) => {
 
 // Get the book list available in the shop
 public_users.get('/',function (req, res) {
-  res.send(JSON.stringify(books,null,4));
+  // Promise/callback
+  axios.get('http://localhost:5000')
+    .then(response => {
+      res.send(JSON.stringify(response.data, null, 4));
+    })
+    .catch(error => {
+      res.status(500).send({ message: 'Error fetching book list', error: error.message });
+    });
 });
 
 // Get book details based on ISBN
-public_users.get('/isbn/:isbn',function (req, res) {
-  const result = books[req.params.isbn];
-  if (result) {
-    res.send(result);
-  } else {
-    res.status(404).send({ error: 'Book not found' });
+public_users.get('/isbn/:isbn', async function (req, res) {
+  // async/await
+  const isbn = req.params.isbn;
+  try {
+    const response = await axios.get(`http://localhost:5000/isbn/${isbn}`);
+    res.send(response.data);
+  } catch (error) {
+    if (error.response && error.response.status === 404) {
+      res.status(404).send({ error: 'Book not found' });
+    } else {
+      res.status(500).send({ message: 'Error fetching book details', error: error.message });
+    }
   }
 });
   
 // Get book details based on author
 public_users.get('/author/:author',function (req, res) {
+  // Promise/callback
   const author = req.params.author.toLowerCase();
-  const bookKeys = Object.keys(books);
-  const results = [];
 
-  bookKeys.forEach(key => {
-    if (books[key].author.toLowerCase() === author) {
-      results.push(books[key]);
-    }
-  });
-
-  if (results.length > 0) {
-    res.send(results);
-  } else {
-    res.status(404).send({ error: 'No books found for this author' });
-  }
+  axios.get(`http://localhost:5000/author/${author}`)
+    .then(response => {
+      res.send(response.data);
+    })
+    .catch(error => {
+      if (error.response && error.response.status === 404) {
+        res.status(404).send({ error: 'No books found for this author' });
+      } else {
+        res.status(500).send({ message: 'Error fetching book details', error: error.message });
+      }
+    });
 });
 
 // Get all books based on title
-public_users.get('/title/:title',function (req, res) {
+public_users.get('/title/:title', async function (req, res) {
+  // async/await
   const title = req.params.title.toLowerCase();
-  const bookKeys = Object.keys(books);
-  const results = [];
 
-  bookKeys.forEach(key => {
-    if (books[key].title.toLowerCase() === title) {
-      results.push(books[key]);
+  try {
+    const response = await axios.get(`http://localhost:5000/title/${title}`);
+    res.send(response.data);
+  } catch (error) {
+    if (error.response && error.response.status === 404) {
+      res.status(404).send({ error: 'No books found with this title' });
+    } else {
+      res.status(500).send({ message: 'Error fetching book details', error: error.message });
     }
-  });
-
-  if (results.length > 0) {
-    res.send(results);
-  } else {
-    res.status(404).send({ error: 'No books found with this title' });
   }
 });
 
